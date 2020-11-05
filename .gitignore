@@ -1,1 +1,5 @@
 /target
+*.crt
+*.csr
+*.key
+*.pfx

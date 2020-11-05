@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 url = "2.1.1"
+native-tls = "0.2.4"
