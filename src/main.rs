@@ -1,6 +1,9 @@
+extern crate url;
+
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpListener;
+use url::Url;
 
 fn main() {
     // 1965 is the standard port for gemini
@@ -18,8 +21,16 @@ fn main() {
                 println!("Could not read from stream: {}", e)
             }
 
-            if let Err(e) = stream.write(b"HELLO") {
-                println!("Could not write to stream: {}", e);
+            let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
+
+            if raw_request.starts_with("gemini://") {
+                raw_request.push_str("gemini://");
+            }
+
+            if let Ok(request) = Url::parse(&raw_request) {
+                if let Err(e) = stream.write(request.path().as_bytes()) {
+                    println!("Could not write to stream: {}", e);
+                }
             }
         }
     }
