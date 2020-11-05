@@ -23,14 +23,26 @@ fn main() {
 
             let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
 
-            if raw_request.starts_with("gemini://") {
-                raw_request.push_str("gemini://");
+            if !raw_request.starts_with("gemini://") {
+                raw_request = "gemini://".to_owned() + &raw_request;
             }
 
-            if let Ok(request) = Url::parse(&raw_request) {
-                if let Err(e) = stream.write(request.path().as_bytes()) {
-                    println!("Could not write to stream: {}", e);
-                }
+            let request = Url::parse(&raw_request).expect("Can not parse URL");
+            let mut response: Vec<u8> = Vec::new();
+
+            // 20 SUCESS status
+            response.extend("20".as_bytes());
+
+            // <Space>
+            response.push(0x20);
+
+            // <Meta>
+            response.extend("SUCCESS".as_bytes());
+
+            response.extend("\r\n".as_bytes());
+
+            if let Err(e) = stream.write(&response) {
+                println!("Could not write to stream: {}", e);
             }
         }
     }
