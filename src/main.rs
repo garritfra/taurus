@@ -12,9 +12,11 @@ use std::thread;
 use url::Url;
 
 fn main() {
-    let mut file = File::open("identity.pfx").unwrap();
+    let mut file =
+        File::open("identity.pfx").expect("File identity.pfx not found in current directory");
     let mut identity = vec![];
-    file.read_to_end(&mut identity).unwrap();
+    file.read_to_end(&mut identity)
+        .expect("Cannot read identity.pfx");
     let identity = Identity::from_pkcs12(&identity, "qqqq").unwrap();
 
     // 1965 is the standard port for gemini
@@ -31,9 +33,9 @@ fn main() {
         match stream {
             Ok(stream) => {
                 let acceptor = acceptor.clone();
-                thread::spawn(move || {
-                    let stream = acceptor.accept(stream).unwrap();
-                    handle_client(stream);
+                thread::spawn(move || match acceptor.accept(stream) {
+                    Ok(stream) => handle_client(stream),
+                    Err(e) => println!("Can't handle stream: {}", e),
                 });
             }
             Err(_e) => println!("Error: {}", _e),
@@ -67,9 +69,32 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
 
     response.extend("\r\n".as_bytes());
 
-    response.extend("Hello World!".as_bytes());
+    let file_path = request
+        .path()
+        .chars()
+        .next()
+        .map(|c| &request.path()[c.len_utf8()..])
+        .unwrap();
+
+    println!("Reading {}", file_path);
+
+    let mut file = File::open(file_path).unwrap();
+    if let Err(e) = file.read_to_end(&mut response) {
+        println!("Could not read file {}", file_path);
+    }
 
     if let Err(e) = stream.write(&response) {
         println!("Could not write to stream: {}", e);
+    }
+}
+
+fn crop_letters(s: &mut String, pos: usize) {
+    match s.char_indices().nth(pos) {
+        Some((pos, _)) => {
+            s.drain(..pos);
+        }
+        None => {
+            s.clear();
+        }
     }
 }
