@@ -80,21 +80,10 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
 
     let mut file = File::open(file_path).unwrap();
     if let Err(e) = file.read_to_end(&mut response) {
-        println!("Could not read file {}", file_path);
+        println!("Could not read file {}", e);
     }
 
     if let Err(e) = stream.write(&response) {
         println!("Could not write to stream: {}", e);
-    }
-}
-
-fn crop_letters(s: &mut String, pos: usize) {
-    match s.char_indices().nth(pos) {
-        Some((pos, _)) => {
-            s.drain(..pos);
-        }
-        None => {
-            s.clear();
-        }
     }
 }
