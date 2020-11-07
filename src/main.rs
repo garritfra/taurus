@@ -58,18 +58,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
     }
 
     let request = gemini::GeminiRequest::from_string(&raw_request).unwrap();
-    let mut response: Vec<u8> = Vec::new();
-
-    // 20 SUCESS status
-    response.extend("20".as_bytes());
-
-    // <Space>
-    response.push(0x20);
-
-    // <Meta>
-    response.extend("text/gemini".as_bytes());
-
-    response.extend("\r\n".as_bytes());
+    let mut response = gemini::GeminiResonse::new();
 
     match request.file_path() {
         Some(file_path) => {
@@ -77,18 +66,28 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
 
             match File::open(file_path) {
                 Ok(mut file) => {
-                    if let Err(e) = file.read_to_end(&mut response) {
+                    let mut body_buf = Vec::new();
+                    if let Err(e) = file.read_to_end(&mut body_buf) {
                         println!("Could not read file {}", e);
                     }
-                    if let Err(e) = stream.write(&response) {
-                        println!("Could not write to stream: {}", e);
-                    }
+
+                    response.body = Some(body_buf);
                 }
                 Err(e) => {
-                    println!("Error ({}): {}", request.file_path().unwrap_or(""), e);
+                    let file_path = request.file_path().unwrap_or("");
+                    println!("Error ({}): {}", file_path, e);
+                    response.status = [b'5', b'1'];
+                    response.meta = format!("Resource not found: {}", file_path).into();
                 }
             }
         }
-        None => println!("No file found in request"),
+        None => {
+            println!("No file found in request");
+            response.status = [b'5', b'1']
+        }
+    }
+
+    if let Err(e) = stream.write(&response.build()) {
+        println!("Could not write to stream: {}", e);
     }
 }

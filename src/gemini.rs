@@ -26,3 +26,40 @@ impl GeminiRequest {
 fn parse_path(req: &str) -> Option<&str> {
     req.split("\r\n").next()
 }
+
+pub struct GeminiResonse {
+    pub status: [u8; 2],
+    pub meta: Vec<u8>,
+    pub body: Option<Vec<u8>>,
+}
+
+impl GeminiResonse {
+    pub fn new() -> Self {
+        GeminiResonse {
+            status: [b'2', b'0'],
+            meta: "text/gemini; charset=utf-8".as_bytes().to_vec(),
+            body: None,
+        }
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::new();
+
+        // 20 SUCESS status
+        buf.extend(&self.status);
+
+        // <Space>
+        buf.push(0x20);
+
+        // <Meta>
+        buf.extend(&self.meta);
+
+        buf.extend("\r\n".as_bytes());
+
+        if let Some(body) = &self.body {
+            buf.extend(body);
+        }
+
+        buf
+    }
+}
