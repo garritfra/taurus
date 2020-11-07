@@ -1,6 +1,8 @@
 extern crate native_tls;
 extern crate url;
 
+mod gemini;
+
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 use std::fs::File;
 use std::io::Read;
@@ -9,34 +11,6 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::thread;
-use url::Url;
-
-struct GeminiRequest {
-    path: Url,
-}
-
-impl GeminiRequest {
-    pub fn from_string(request: &str) -> Result<Self, String> {
-        let gemini_request = GeminiRequest {
-            path: Url::parse(&parse_path(request).ok_or("Invalid path")?.to_string())
-                .map_err(|e| e.to_string())?,
-        };
-
-        Ok(gemini_request)
-    }
-
-    pub fn file_path(&self) -> Option<&str> {
-        self.path
-            .path()
-            .chars()
-            .next()
-            .map(|c| &self.path.path()[c.len_utf8()..])
-    }
-}
-
-fn parse_path(req: &str) -> Option<&str> {
-    req.split("\r\n").next()
-}
 
 fn main() {
     let mut file =
@@ -83,7 +57,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
         raw_request = "gemini://".to_owned() + &raw_request;
     }
 
-    let request = GeminiRequest::from_string(&raw_request).unwrap();
+    let request = gemini::GeminiRequest::from_string(&raw_request).unwrap();
     let mut response: Vec<u8> = Vec::new();
 
     // 20 SUCESS status
