@@ -11,6 +11,33 @@ use std::sync::Arc;
 use std::thread;
 use url::Url;
 
+struct GeminiRequest {
+    path: Url,
+}
+
+impl GeminiRequest {
+    pub fn from_string(request: &str) -> Result<Self, String> {
+        let gemini_request = GeminiRequest {
+            path: Url::parse(&parse_path(request).ok_or("Invalid path")?.to_string())
+                .map_err(|e| e.to_string())?,
+        };
+
+        Ok(gemini_request)
+    }
+
+    pub fn file_path(&self) -> Option<&str> {
+        self.path
+            .path()
+            .chars()
+            .next()
+            .map(|c| &self.path.path()[c.len_utf8()..])
+    }
+}
+
+fn parse_path(req: &str) -> Option<&str> {
+    req.split("\r\n").next()
+}
+
 fn main() {
     let mut file =
         File::open("identity.pfx").expect("File identity.pfx not found in current directory");
@@ -51,11 +78,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
 
     let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
 
+    // TODO: Redundantly converted to owned and later referenced again
     if !raw_request.starts_with("gemini://") {
         raw_request = "gemini://".to_owned() + &raw_request;
     }
 
-    let request = Url::parse(&raw_request).expect("Can not parse URL");
+    let request = GeminiRequest::from_string(&raw_request).unwrap();
     let mut response: Vec<u8> = Vec::new();
 
     // 20 SUCESS status
@@ -69,21 +97,24 @@ fn handle_client(mut stream: TlsStream<TcpStream>) {
 
     response.extend("\r\n".as_bytes());
 
-    let file_path = request
-        .path()
-        .chars()
-        .next()
-        .map(|c| &request.path()[c.len_utf8()..])
-        .unwrap();
+    match request.file_path() {
+        Some(file_path) => {
+            println!("Reading {}", file_path);
 
-    println!("Reading {}", file_path);
-
-    let mut file = File::open(file_path).unwrap();
-    if let Err(e) = file.read_to_end(&mut response) {
-        println!("Could not read file {}", e);
-    }
-
-    if let Err(e) = stream.write(&response) {
-        println!("Could not write to stream: {}", e);
+            match File::open(file_path) {
+                Ok(mut file) => {
+                    if let Err(e) = file.read_to_end(&mut response) {
+                        println!("Could not read file {}", e);
+                    }
+                    if let Err(e) = stream.write(&response) {
+                        println!("Could not write to stream: {}", e);
+                    }
+                }
+                Err(e) => {
+                    println!("Error ({}): {}", request.file_path().unwrap_or(""), e);
+                }
+            }
+        }
+        None => println!("No file found in request"),
     }
 }
