@@ -14,20 +14,13 @@ impl GeminiRequest {
         Ok(gemini_request)
     }
 
-    fn unsafe_file_path(&self) -> Option<&str> {
+    /// Get file path
+    pub fn file_path(&self) -> &str {
         self.path
             .path()
             .chars()
             .next()
-            .map(|c| &self.path.path()[c.len_utf8()..])
-    }
-
-    pub fn file_path(&self) -> Option<&str> {
-        match self.unsafe_file_path() {
-            Some(path) if path.contains("..") || path.starts_with("/") => None,
-            Some(path) => Some(path),
-            None => None,
-        }
+            .map_or("", |c| &self.path.path()[c.len_utf8()..])
     }
 }
 
