@@ -1,3 +1,6 @@
+use native_tls::TlsStream;
+use std::io::Write;
+use std::net::TcpStream;
 use url::Url;
 
 pub struct GeminiRequest {
@@ -35,18 +38,26 @@ pub struct GeminiResponse {
 }
 
 impl GeminiResponse {
-    pub fn new() -> Self {
+    pub fn success(body: Vec<u8>) -> Self {
         GeminiResponse {
             status: [b'2', b'0'],
             meta: "text/gemini; charset=utf-8".as_bytes().to_vec(),
+            body: Some(body),
+        }
+    }
+
+    pub fn not_found() -> Self {
+        GeminiResponse {
+            status: [b'5', b'1'],
+            meta: "Resource not found".into(),
             body: None,
         }
     }
 
-    pub fn build(&self) -> Vec<u8> {
+    pub fn send(&self, mut stream: TlsStream<TcpStream>) -> Result<usize, String> {
         let mut buf: Vec<u8> = Vec::new();
 
-        // 20 SUCESS status
+        // <Status>
         buf.extend(&self.status);
 
         // <Space>
@@ -61,6 +72,8 @@ impl GeminiResponse {
             buf.extend(body);
         }
 
-        buf
+        stream
+            .write(&buf)
+            .map_err(|e| format!("could not write to stream: {}", e))
     }
 }
