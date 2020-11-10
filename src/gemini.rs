@@ -41,7 +41,7 @@ impl GeminiResponse {
     pub fn success(body: Vec<u8>) -> Self {
         GeminiResponse {
             status: [b'2', b'0'],
-            meta: "text/gemini; charset=utf-8".as_bytes().to_vec(),
+            meta: b"text/gemini; charset=utf-8".to_vec(),
             body: Some(body),
         }
     }
@@ -66,7 +66,7 @@ impl GeminiResponse {
         // <Meta>
         buf.extend(&self.meta);
 
-        buf.extend("\r\n".as_bytes());
+        buf.extend(b"\r\n");
 
         if let Some(body) = &self.body {
             buf.extend(body);

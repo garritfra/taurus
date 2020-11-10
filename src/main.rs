@@ -131,7 +131,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
 
     if file_path.has_root() {
         // File starts with `/` (*nix) or `\\` (Windows), decline it
-        return GeminiResponse::not_found().send(stream);
+        GeminiResponse::not_found().send(stream)
     } else {
         let path = path::Path::new(&static_root)
             .join(&file_path)
@@ -148,12 +148,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
                     .ok_or("invalid Unicode".to_owned())?
                     .to_owned();
 
-                return write_file(&index_path).send(stream);
+                write_file(&index_path).send(stream)
             } else {
-                return write_file(path.to_str().ok_or("invalid Unicode".to_owned())?).send(stream);
+                write_file(path.to_str().ok_or("invalid Unicode".to_owned())?).send(stream)
             }
         } else {
-            return GeminiResponse::not_found().send(stream);
+            GeminiResponse::not_found().send(stream)
         }
     }
 }
