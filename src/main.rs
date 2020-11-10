@@ -13,8 +13,26 @@ use std::path;
 use std::sync::Arc;
 use std::thread;
 
+use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
+
 fn main() -> Result<(), error::SimpleError> {
-    let config: config::Config = config::Config::load(None)
+    // CLI
+    let matches = App::new(crate_name!())
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about(crate_description!())
+        .arg(
+            Arg::with_name("config")
+                .long("config")
+                .short("c")
+                .help("Alternative config file location [default /etc/taurus/taurus.toml]")
+                .next_line_help(true)
+                .value_name("FILE"),
+        )
+        .get_matches();
+
+    let config_path = matches.value_of("config").map(|v| v.to_owned());
+    let config: config::Config = config::Config::load(config_path)
         .map_err(|err| format!("failed to read configuration file: {}", err))?;
 
     // Defaults for configuration file

@@ -1,5 +1,6 @@
 [package]
 name = "taurus"
+description = "A concurrent gemini server"
 version = "0.0.1"
 authors = ["Garrit Franke <garritfranke@gmail.com>"]
 edition = "2018"
@@ -12,3 +13,4 @@ native-tls = "0.2.4"
 serde = { version = "1.0.117", features = ["derive"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
+clap = "2.33.3"
