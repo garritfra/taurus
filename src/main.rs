@@ -1,51 +1,66 @@
 extern crate native_tls;
 extern crate url;
 
+mod config;
+mod error;
 mod gemini;
 
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 use std::fs::File;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::net::TcpListener;
-use std::net::TcpStream;
+use std::io::{self, Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path;
 use std::sync::Arc;
 use std::thread;
 
-fn main() {
+fn main() -> Result<(), error::SimpleError> {
+    let config: config::Config = config::Config::load(None)
+        .map_err(|err| format!("failed to read configuration file: {}", err))?;
+
+    // Defaults for configuration file
+    let port = config.port.unwrap_or(1965);
+    let cert_file = config
+        .certificate_file
+        .unwrap_or_else(|| "/etc/taurus/identity.pfx".to_owned());
+    let static_root = config
+        .static_root
+        .unwrap_or_else(|| "/var/www/gemini".to_owned());
+
+    // Read certificate
     let mut file =
-        File::open("identity.pfx").expect("File identity.pfx not found in current directory");
+        File::open(cert_file).map_err(|err| format!("failed to open identity file: {}", err))?;
+
     let mut identity = vec![];
     file.read_to_end(&mut identity)
-        .expect("Cannot read identity.pfx");
-    let identity = Identity::from_pkcs12(&identity, "qqqq").unwrap();
+        .map_err(|err| format!("failed to read identity file: {}", err))?;
 
-    // 1965 is the standard port for gemini
-    let port = "1965";
+    let identity = Identity::from_pkcs12(&identity, &config.certificate_password)
+        .map_err(|err| format!("failed to parse certificate: {}", err))?;
+
     let address = format!("0.0.0.0:{}", port);
-    let listener =
-        TcpListener::bind(address).unwrap_or_else(|_| panic!("Could not bind to port {}", port));
+    let listener = TcpListener::bind(address).map_err(|err| format!("failed to bind: {}", err))?;
     let acceptor = TlsAcceptor::new(identity).unwrap();
     let acceptor = Arc::new(acceptor);
 
-    println!("Listening on port 1965");
+    println!("Info: Listening on port {}", port);
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let acceptor = acceptor.clone();
+                let static_root = static_root.clone();
+
                 thread::spawn(move || match acceptor.accept(stream) {
-                    Ok(stream) => {
-                        handle_client(stream).unwrap_or_else(|e| println!("Error: {}", e))
-                    }
-                    Err(e) => println!("Can't handle stream: {}", e),
+                    Ok(stream) => handle_client(stream, &static_root)
+                        .unwrap_or_else(|e| println!("Error: {}", e)),
+                    Err(e) => println!("Error: can't handle stream: {}", e),
                 });
             }
             Err(err) => println!("Error: {}", err),
         }
     }
+
+    Ok(())
 }
 
 /// Helper function to read a file into Vec
@@ -67,7 +82,7 @@ fn send_file(path: &str, response: &mut gemini::GeminiResonse) {
         Err(err) => {
             // Cannot read file or it doesn't exist
 
-            println!("Error ({}): {}", path, err);
+            println!("Error [{}]: {}", path, err);
 
             response.status = [b'5', b'1'];
             response.meta = format!("Resource not found: {}", path).into();
@@ -85,10 +100,10 @@ fn redirect(path: &str, response: &mut gemini::GeminiResonse) {
     response.meta = path.into();
 }
 
-fn handle_client(mut stream: TlsStream<TcpStream>) -> Result<(), String> {
+fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<(), String> {
     let mut buffer = [0; 1024];
     if let Err(e) = stream.read(&mut buffer) {
-        println!("Could not read from stream: {}", e)
+        return Err(format!("could not read from stream: {}", e));
     }
 
     let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
@@ -110,23 +125,28 @@ fn handle_client(mut stream: TlsStream<TcpStream>) -> Result<(), String> {
     } else {
         let path = path::Path::new(".").join(file_path).as_path().to_owned();
 
+        let actual_path = path::Path::new(&static_root)
+            .join(&path)
+            .as_path()
+            .to_owned();
+
         // Check if file/dir exists
-        if path.exists() {
+        if actual_path.exists() {
             // If it's a directory, try to find index.gmi
-            if path.is_dir() {
+            if actual_path.is_dir() {
                 let redir_path = path
                     .join("index.gmi")
                     .iter()
                     .skip(1)
                     .collect::<path::PathBuf>()
                     .to_str()
-                    .ok_or("Invalid Unicode".to_owned())?
+                    .ok_or("invalid Unicode".to_owned())?
                     .to_owned();
 
                 redirect(&("/".to_owned() + &redir_path), &mut response);
             } else {
                 send_file(
-                    path.to_str().ok_or("Invalid Unicode".to_owned())?,
+                    actual_path.to_str().ok_or("invalid Unicode".to_owned())?,
                     &mut response,
                 );
             }
@@ -136,7 +156,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>) -> Result<(), String> {
     }
 
     if let Err(e) = stream.write(&response.build()) {
-        println!("Could not write to stream: {}", e);
+        return Err(format!("could not write to stream: {}", e));
     }
 
     Ok(())
