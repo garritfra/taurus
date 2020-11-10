@@ -113,11 +113,6 @@ fn not_found(path: &str, response: &mut gemini::GeminiResonse) {
     response.meta = format!("Resource not found: {}", path).into();
 }
 
-fn redirect(path: &str, response: &mut gemini::GeminiResonse) {
-    response.status = [b'3', b'1'];
-    response.meta = path.into();
-}
-
 fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<(), String> {
     let mut buffer = [0; 1024];
     if let Err(e) = stream.read(&mut buffer) {
@@ -152,16 +147,13 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
         if actual_path.exists() {
             // If it's a directory, try to find index.gmi
             if actual_path.is_dir() {
-                let redir_path = path
+                let index_path = actual_path
                     .join("index.gmi")
-                    .iter()
-                    .skip(1)
-                    .collect::<path::PathBuf>()
                     .to_str()
                     .ok_or("invalid Unicode".to_owned())?
                     .to_owned();
 
-                redirect(&("/".to_owned() + &redir_path), &mut response);
+                send_file(&index_path, &mut response);
             } else {
                 send_file(
                     actual_path.to_str().ok_or("invalid Unicode".to_owned())?,
