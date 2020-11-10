@@ -114,15 +114,16 @@ fn handle_client(mut stream: TlsStream<TcpStream>) -> Result<(), String> {
         if path.exists() {
             // If it's a directory, try to find index.gmi
             if path.is_dir() {
-                redirect(
-                    path.join("index.gmi")
-                        .iter()
-                        .skip(1)
-                        .collect::<path::PathBuf>()
-                        .to_str()
-                        .ok_or("Invalid Unicode".to_owned())?,
-                    &mut response,
-                );
+                let redir_path = path
+                    .join("index.gmi")
+                    .iter()
+                    .skip(1)
+                    .collect::<path::PathBuf>()
+                    .to_str()
+                    .ok_or("Invalid Unicode".to_owned())?
+                    .to_owned();
+
+                redirect(&("/".to_owned() + &redir_path), &mut response);
             } else {
                 send_file(
                     path.to_str().ok_or("Invalid Unicode".to_owned())?,
