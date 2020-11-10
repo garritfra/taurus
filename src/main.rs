@@ -103,14 +103,14 @@ fn send_file(path: &str, response: &mut gemini::GeminiResonse) {
             println!("Error [{}]: {}", path, err);
 
             response.status = [b'5', b'1'];
-            response.meta = format!("Resource not found: {}", path).into();
+            response.meta = "Resource not found".into();
         }
     }
 }
 
-fn not_found(path: &str, response: &mut gemini::GeminiResonse) {
+fn not_found(response: &mut gemini::GeminiResonse) {
     response.status = [b'5', b'1'];
-    response.meta = format!("Resource not found: {}", path).into();
+    response.meta = "Resource not found".into();
 }
 
 fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<(), String> {
@@ -134,20 +134,18 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
 
     if file_path.has_root() {
         // File starts with `/` (*nix) or `\\` (Windows), decline it
-        not_found(url_path, &mut response);
+        not_found(&mut response);
     } else {
-        let path = path::Path::new(".").join(file_path).as_path().to_owned();
-
-        let actual_path = path::Path::new(&static_root)
-            .join(&path)
+        let path = path::Path::new(&static_root)
+            .join(&file_path)
             .as_path()
             .to_owned();
 
         // Check if file/dir exists
-        if actual_path.exists() {
+        if path.exists() {
             // If it's a directory, try to find index.gmi
-            if actual_path.is_dir() {
-                let index_path = actual_path
+            if path.is_dir() {
+                let index_path = path
                     .join("index.gmi")
                     .to_str()
                     .ok_or("invalid Unicode".to_owned())?
@@ -156,12 +154,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
                 send_file(&index_path, &mut response);
             } else {
                 send_file(
-                    actual_path.to_str().ok_or("invalid Unicode".to_owned())?,
+                    path.to_str().ok_or("invalid Unicode".to_owned())?,
                     &mut response,
                 );
             }
         } else {
-            not_found(url_path, &mut response);
+            not_found(&mut response);
         }
     }
 
