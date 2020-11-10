@@ -92,7 +92,7 @@ fn read_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
 }
 
 /// Send file as a response
-fn send_file(path: &str, response: &mut gemini::GeminiResonse) {
+fn send_file(path: &str, response: &mut gemini::GeminiResponse) {
     match read_file(path) {
         Ok(buf) => {
             response.body = Some(buf);
@@ -108,7 +108,7 @@ fn send_file(path: &str, response: &mut gemini::GeminiResonse) {
     }
 }
 
-fn not_found(response: &mut gemini::GeminiResonse) {
+fn not_found(response: &mut gemini::GeminiResponse) {
     response.status = [b'5', b'1'];
     response.meta = "Resource not found".into();
 }
@@ -127,7 +127,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
     }
 
     let request = gemini::GeminiRequest::from_string(&raw_request).unwrap();
-    let mut response = gemini::GeminiResonse::new();
+    let mut response = gemini::GeminiResponse::new();
 
     let url_path = request.file_path();
     let file_path = path::Path::new(url_path);

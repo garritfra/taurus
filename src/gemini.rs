@@ -28,15 +28,15 @@ fn parse_path(req: &str) -> Option<&str> {
     req.split("\r\n").next()
 }
 
-pub struct GeminiResonse {
+pub struct GeminiResponse {
     pub status: [u8; 2],
     pub meta: Vec<u8>,
     pub body: Option<Vec<u8>>,
 }
 
-impl GeminiResonse {
+impl GeminiResponse {
     pub fn new() -> Self {
-        GeminiResonse {
+        GeminiResponse {
             status: [b'2', b'0'],
             meta: "text/gemini; charset=utf-8".as_bytes().to_vec(),
             body: None,
