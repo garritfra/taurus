@@ -158,12 +158,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
                 let index_path = path
                     .join("index.gmi")
                     .to_str()
-                    .ok_or("invalid Unicode".to_owned())?
+                    .ok_or_else(|| "invalid Unicode".to_owned())?
                     .to_owned();
 
                 write_file(&index_path)?.send(stream)
             } else {
-                write_file(path.to_str().ok_or("invalid Unicode".to_owned())?)?.send(stream)
+                write_file(path.to_str().ok_or_else(|| "invalid Unicode".to_owned())?)?.send(stream)
             }
         } else {
             GeminiResponse::not_found().send(stream)
