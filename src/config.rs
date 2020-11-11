@@ -13,9 +13,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(config_path: Option<String>) -> anyhow::Result<Self> {
-        let config_path = config_path.unwrap_or_else(|| "/etc/taurus/taurus.toml".to_owned());
-
+    pub fn load(config_path: &str) -> anyhow::Result<Self> {
         let mut file = fs::File::open(config_path)?;
         let mut contents = String::new();
 

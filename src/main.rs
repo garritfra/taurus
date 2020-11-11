@@ -41,7 +41,7 @@ fn run() -> Result<(), error::TaurusError> {
         )
         .get_matches();
 
-    let config_path = matches.value_of("config").map(|v| v.to_owned());
+    let config_path = matches.value_of("config").unwrap();
     let config: config::Config =
         config::Config::load(config_path).map_err(error::TaurusError::InvalidConfig)?;
 
