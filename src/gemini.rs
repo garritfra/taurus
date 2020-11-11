@@ -38,10 +38,10 @@ pub struct GeminiResponse {
 }
 
 impl GeminiResponse {
-    pub fn success(body: Vec<u8>) -> Self {
+    pub fn success(body: Vec<u8>, mime_type: &str) -> Self {
         GeminiResponse {
             status: [b'2', b'0'],
-            meta: b"text/gemini; charset=utf-8".to_vec(),
+            meta: mime_type.as_bytes().to_vec(),
             body: Some(body),
         }
     }

@@ -99,15 +99,28 @@ fn read_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
 }
 
 /// Send file as a response
-fn write_file(path: &str) -> GeminiResponse {
+fn write_file(path: &str) -> Result<GeminiResponse, String> {
+    let extension = path::Path::new(path)
+        .extension()
+        .unwrap_or_else(|| std::ffi::OsStr::new(""))
+        .to_str()
+        .ok_or_else(|| "invalid Unicode".to_owned())?;
+
+    let mime_type = match extension {
+        "gmi" => "text/gemini; charset=utf-8",
+        ext => mime_guess::from_ext(ext)
+            .first_raw()
+            .unwrap_or("text/plain"),
+    };
+
     match read_file(path) {
-        Ok(buf) => GeminiResponse::success(buf),
+        Ok(buf) => Ok(GeminiResponse::success(buf, mime_type)),
         Err(err) => {
             // Cannot read file or it doesn't exist
 
             println!("Error [{}]: {}", path, err);
 
-            GeminiResponse::not_found()
+            Ok(GeminiResponse::not_found())
         }
     }
 }
@@ -148,9 +161,9 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
                     .ok_or("invalid Unicode".to_owned())?
                     .to_owned();
 
-                write_file(&index_path).send(stream)
+                write_file(&index_path)?.send(stream)
             } else {
-                write_file(path.to_str().ok_or("invalid Unicode".to_owned())?).send(stream)
+                write_file(path.to_str().ok_or("invalid Unicode".to_owned())?)?.send(stream)
             }
         } else {
             GeminiResponse::not_found().send(stream)
