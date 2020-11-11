@@ -1,3 +1,4 @@
+use crate::error;
 use native_tls::TlsStream;
 use std::io::Write;
 use std::net::TcpStream;
@@ -54,7 +55,7 @@ impl GeminiResponse {
         }
     }
 
-    pub fn send(&self, mut stream: TlsStream<TcpStream>) -> Result<usize, String> {
+    pub fn send(&self, mut stream: TlsStream<TcpStream>) -> Result<usize, error::TaurusError> {
         let mut buf: Vec<u8> = Vec::new();
 
         // <Status>
@@ -74,6 +75,6 @@ impl GeminiResponse {
 
         stream
             .write(&buf)
-            .map_err(|e| format!("could not write to stream: {}", e))
+            .map_err(error::TaurusError::StreamWriteFailed)
     }
 }

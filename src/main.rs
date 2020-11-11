@@ -17,7 +17,14 @@ use std::thread;
 
 use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
 
-fn main() -> Result<(), error::SimpleError> {
+fn main() {
+    if let Err(e) = run() {
+        println!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), error::TaurusError> {
     // CLI
     let matches = App::new(crate_name!())
         .version(crate_version!())
@@ -34,8 +41,8 @@ fn main() -> Result<(), error::SimpleError> {
         .get_matches();
 
     let config_path = matches.value_of("config").map(|v| v.to_owned());
-    let config: config::Config = config::Config::load(config_path)
-        .map_err(|err| format!("failed to read configuration file: {}", err))?;
+    let config: config::Config =
+        config::Config::load(config_path).map_err(error::TaurusError::InvalidConfig)?;
 
     // Defaults for configuration file
     let port = config.port.unwrap_or(1965);
@@ -47,18 +54,13 @@ fn main() -> Result<(), error::SimpleError> {
         .unwrap_or_else(|| "/var/www/gemini".to_owned());
 
     // Read certificate
-    let mut file =
-        File::open(cert_file).map_err(|err| format!("failed to open identity file: {}", err))?;
-
-    let mut identity = vec![];
-    file.read_to_end(&mut identity)
-        .map_err(|err| format!("failed to read identity file: {}", err))?;
+    let identity = read_file(&cert_file).map_err(error::TaurusError::NoIdentity)?;
 
     let identity = Identity::from_pkcs12(&identity, &config.certificate_password)
-        .map_err(|err| format!("failed to parse certificate: {}", err))?;
+        .map_err(error::TaurusError::InvalidCertificate)?;
 
     let address = format!("0.0.0.0:{}", port);
-    let listener = TcpListener::bind(address).map_err(|err| format!("failed to bind: {}", err))?;
+    let listener = TcpListener::bind(address).map_err(|err| error::TaurusError::BindFailed(err))?;
     let acceptor = TlsAcceptor::new(identity).unwrap();
     let acceptor = Arc::new(acceptor);
 
@@ -99,12 +101,12 @@ fn read_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
 }
 
 /// Send file as a response
-fn write_file(path: &str) -> Result<GeminiResponse, String> {
+fn write_file(path: &str) -> Result<GeminiResponse, error::TaurusError> {
     let extension = path::Path::new(path)
         .extension()
         .unwrap_or_else(|| std::ffi::OsStr::new(""))
         .to_str()
-        .ok_or_else(|| "invalid Unicode".to_owned())?;
+        .ok_or(error::TaurusError::InvalidUnicode)?;
 
     let mime_type = match extension {
         "gmi" => "text/gemini; charset=utf-8",
@@ -125,11 +127,15 @@ fn write_file(path: &str) -> Result<GeminiResponse, String> {
     }
 }
 
-fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<usize, String> {
+fn handle_client(
+    mut stream: TlsStream<TcpStream>,
+    static_root: &str,
+) -> Result<usize, error::TaurusError> {
     let mut buffer = [0; 1024];
-    if let Err(e) = stream.read(&mut buffer) {
-        return Err(format!("could not read from stream: {}", e));
-    }
+
+    stream
+        .read(&mut buffer)
+        .map_err(error::TaurusError::StreamReadFailed)?;
 
     let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
 
@@ -158,12 +164,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> Result<
                 let index_path = path
                     .join("index.gmi")
                     .to_str()
-                    .ok_or_else(|| "invalid Unicode".to_owned())?
+                    .ok_or(error::TaurusError::InvalidUnicode)?
                     .to_owned();
 
                 write_file(&index_path)?.send(stream)
             } else {
-                write_file(path.to_str().ok_or_else(|| "invalid Unicode".to_owned())?)?.send(stream)
+                write_file(path.to_str().ok_or(error::TaurusError::InvalidUnicode)?)?.send(stream)
             }
         } else {
             GeminiResponse::not_found().send(stream)
