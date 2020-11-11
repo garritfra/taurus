@@ -34,7 +34,8 @@ fn run() -> Result<(), error::TaurusError> {
             Arg::with_name("config")
                 .long("config")
                 .short("c")
-                .help("Alternative config file location [default /etc/taurus/taurus.toml]")
+                .help("Specify an alternative config file")
+                .default_value("/etc/taurus/taurus.toml")
                 .next_line_help(true)
                 .value_name("FILE"),
         )
