@@ -104,11 +104,9 @@ fn read_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
 fn write_file(path: &str) -> Result<GeminiResponse, error::TaurusError> {
     let extension = path::Path::new(path)
         .extension()
-        .unwrap_or_else(|| std::ffi::OsStr::new(""))
-        .to_str()
-        .ok_or(error::TaurusError::InvalidUnicode)?;
+        .unwrap_or_else(|| std::ffi::OsStr::new(""));
 
-    let mime_type = match extension {
+    let mime_type = match &*extension.to_string_lossy() {
         "gmi" => "text/gemini; charset=utf-8",
         ext => mime_guess::from_ext(ext)
             .first_raw()
@@ -161,15 +159,9 @@ fn handle_client(
         if path.exists() {
             // If it's a directory, try to find index.gmi
             if path.is_dir() {
-                let index_path = path
-                    .join("index.gmi")
-                    .to_str()
-                    .ok_or(error::TaurusError::InvalidUnicode)?
-                    .to_owned();
-
-                write_file(&index_path)?.send(stream)
+                write_file(&path.join("index.gmi").to_string_lossy())?.send(stream)
             } else {
-                write_file(path.to_str().ok_or(error::TaurusError::InvalidUnicode)?)?.send(stream)
+                write_file(&path.to_string_lossy())?.send(stream)
             }
         } else {
             GeminiResponse::not_found().send(stream)

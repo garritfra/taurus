@@ -15,9 +15,6 @@ pub enum TaurusError {
     #[error("failed to bind: {0}")]
     BindFailed(io::Error),
 
-    #[error("invalid Unicode input")]
-    InvalidUnicode,
-
     #[error("could not read the stream")]
     StreamReadFailed(io::Error),
 
