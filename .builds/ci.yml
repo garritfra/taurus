@@ -1,0 +1,10 @@
+image: archlinux
+packages:
+  - rust
+sources:
+  - https://git.sr.ht/~garritfra/taurus
+tasks:
+  - build: |
+      cd taurus
+      cargo build
+      cargo test
