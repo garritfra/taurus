@@ -1,6 +1,8 @@
 use std::io;
 use thiserror::Error;
 
+pub type TaurusResult<T> = Result<T, TaurusError>;
+
 #[derive(Error, Debug)]
 pub enum TaurusError {
     #[error("failed to read configuration file: {0:#?}")]
