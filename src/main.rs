@@ -57,11 +57,10 @@ fn run() -> Result<(), error::TaurusError> {
     // Read certificate
     let identity = read_file(&cert_file).map_err(error::TaurusError::NoIdentity)?;
 
-    let identity = Identity::from_pkcs12(&identity, &config.certificate_password)
-        .map_err(error::TaurusError::InvalidCertificate)?;
+    let identity = Identity::from_pkcs12(&identity, &config.certificate_password)?;
 
     let address = format!("0.0.0.0:{}", port);
-    let listener = TcpListener::bind(address).map_err(|err| error::TaurusError::BindFailed(err))?;
+    let listener = TcpListener::bind(address).map_err(error::TaurusError::BindFailed)?;
     let acceptor = TlsAcceptor::new(identity).unwrap();
     let acceptor = Arc::new(acceptor);
 

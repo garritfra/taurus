@@ -10,7 +10,7 @@ pub enum TaurusError {
     NoIdentity(io::Error),
 
     #[error("failed parse certificate: {0:#?}")]
-    InvalidCertificate(native_tls::Error),
+    InvalidCertificate(#[from] native_tls::Error),
 
     #[error("failed to bind: {0}")]
     BindFailed(io::Error),
