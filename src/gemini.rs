@@ -29,6 +29,7 @@ impl FromStr for GeminiRequest {
     fn from_str(s: &str) -> TaurusResult<Self> {
         // Extract and parse the url from the request.
         let raw = s
+            .trim_end_matches(0x0 as char)
             .strip_suffix("\r\n")
             .ok_or_else(|| TaurusError::InvalidRequest("malformed request".into()))?;
         let url = Url::parse(&raw)
