@@ -4,6 +4,7 @@ extern crate url;
 mod config;
 mod error;
 mod gemini;
+mod logger;
 
 use error::{TaurusError, TaurusResult};
 use gemini::{GeminiRequest, GeminiResponse};
@@ -21,7 +22,7 @@ use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg
 
 fn main() {
     if let Err(e) = run() {
-        println!("Error: {}", e);
+        logger::error(e);
         std::process::exit(1);
     }
 }
@@ -66,7 +67,7 @@ fn run() -> TaurusResult<()> {
     let acceptor = TlsAcceptor::new(identity).unwrap();
     let acceptor = Arc::new(acceptor);
 
-    println!("Info: Listening on port {}", port);
+    logger::info(format!("Listening on port {}", port));
 
     for stream in listener.incoming() {
         match stream {
@@ -77,15 +78,15 @@ fn run() -> TaurusResult<()> {
                 thread::spawn(move || match acceptor.accept(stream) {
                     Ok(stream) => {
                         if let Err(e) = handle_client(stream, &static_root) {
-                            println!("Error: can't handle client: {}", e);
+                            logger::error(format!("Can't handle client: {}", e));
                         }
                     }
                     Err(e) => {
-                        println!("Error: can't handle stream: {}", e);
+                        logger::error(format!("Can't handle stream: {}", e));
                     }
                 });
             }
-            Err(err) => println!("Error: {}", err),
+            Err(err) => logger::error(err),
         }
     }
 
@@ -119,8 +120,7 @@ fn write_file(path: &str) -> TaurusResult<GeminiResponse> {
         Ok(buf) => Ok(GeminiResponse::success(buf, mime_type)),
         Err(err) => {
             // Cannot read file or it doesn't exist
-
-            println!("Error [{}]: {}", path, err);
+            logger::error(format!("{}: {}", path, err));
 
             Ok(GeminiResponse::not_found())
         }
