@@ -1,35 +1,41 @@
 use crate::error::{TaurusError, TaurusResult};
 use native_tls::TlsStream;
-use std::io::Write;
-use std::net::TcpStream;
+use std::{io::Write, net::TcpStream, str::FromStr};
 use url::Url;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct GeminiRequest {
-    path: Url,
+    url: Url,
 }
 
 impl GeminiRequest {
-    pub fn from_string(request: &str) -> Result<Self, String> {
-        let gemini_request = GeminiRequest {
-            path: Url::parse(&parse_path(request).ok_or("Invalid path")?.to_string())
-                .map_err(|e| e.to_string())?,
-        };
-
-        Ok(gemini_request)
+    pub fn parse(request: &str) -> TaurusResult<Self> {
+        Self::from_str(request)
     }
 
     /// Get file path
     pub fn file_path(&self) -> &str {
-        self.path
+        self.url
             .path()
             .chars()
             .next()
-            .map_or("", |c| &self.path.path()[c.len_utf8()..])
+            .map_or("", |c| &self.url.path()[c.len_utf8()..])
     }
 }
 
-fn parse_path(req: &str) -> Option<&str> {
-    req.split("\r\n").next()
+impl FromStr for GeminiRequest {
+    type Err = TaurusError;
+
+    fn from_str(s: &str) -> TaurusResult<Self> {
+        // Extract and parse the url from the request.
+        let raw = s
+            .strip_suffix("\r\n")
+            .ok_or_else(|| TaurusError::InvalidRequest("malformed request".into()))?;
+        let url = Url::parse(&raw)
+            .map_err(|e| TaurusError::InvalidRequest(format!("invalid url: {}", e)))?;
+
+        Ok(Self { url })
+    }
 }
 
 pub struct GeminiResponse {
@@ -74,5 +80,43 @@ impl GeminiResponse {
         }
 
         stream.write(&buf).map_err(TaurusError::StreamWriteFailed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_request() {
+        let raw = "gemini://example.space\r\n";
+
+        let req = GeminiRequest::parse(raw).unwrap();
+        assert_eq!(
+            req,
+            GeminiRequest {
+                url: Url::parse("gemini://example.space").unwrap()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_malformed_request() {
+        let raw = "gemini://example.space";
+
+        match GeminiRequest::parse(raw) {
+            Err(TaurusError::InvalidRequest(_)) => {}
+            x => panic!("expected TaurusError::InvalidRequest, got: {:?}", x),
+        }
+    }
+
+    #[test]
+    fn parse_invalid_request_url() {
+        let raw = "foobar@example.com\r\n";
+
+        match GeminiRequest::parse(raw) {
+            Err(TaurusError::InvalidRequest(_)) => {}
+            x => panic!("expected TaurusError::InvalidRequest, got: {:?}", x),
+        }
     }
 }

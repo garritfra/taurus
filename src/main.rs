@@ -5,16 +5,17 @@ mod config;
 mod error;
 mod gemini;
 
-use gemini::GeminiResponse;
-
 use error::{TaurusError, TaurusResult};
+use gemini::{GeminiRequest, GeminiResponse};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
-use std::fs::File;
-use std::io::{self, Read};
-use std::net::{TcpListener, TcpStream};
-use std::path;
-use std::sync::Arc;
-use std::thread;
+use std::{
+    fs::File,
+    io::{self, Read},
+    net::{TcpListener, TcpStream},
+    path,
+    sync::Arc,
+    thread,
+};
 
 use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
 
@@ -133,14 +134,12 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> TaurusR
         .read(&mut buffer)
         .map_err(TaurusError::StreamReadFailed)?;
 
-    let mut raw_request = String::from_utf8_lossy(&buffer[..]).to_mut().to_owned();
-
-    // TODO: Redundantly converted to owned and later referenced again
+    let mut raw_request = String::from_utf8_lossy(&buffer[..]).into_owned();
     if !raw_request.starts_with("gemini://") {
-        raw_request = "gemini://".to_owned() + &raw_request;
+        raw_request = format!("gemini://{}", raw_request);
     }
 
-    let request = gemini::GeminiRequest::from_string(&raw_request).unwrap();
+    let request = GeminiRequest::parse(&raw_request)?;
     let url_path = request.file_path();
     let file_path = path::Path::new(url_path);
 
