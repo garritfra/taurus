@@ -27,6 +27,27 @@ impl FromStr for GeminiRequest {
     type Err = TaurusError;
 
     fn from_str(s: &str) -> TaurusResult<Self> {
+        let mut s = s.to_string();
+
+        // Add gemini: scheme if not explicitly set
+        if s.starts_with("//") {
+            s = format!("gemini:{}", s);
+        }
+
+        // Check protocol
+        if let Some(proto_end) = s.find("://") {
+            // If set, check if it's allowed
+            let protocol = &s[..proto_end];
+
+            if protocol != "gemini" {
+                // TODO: return 53 error instead of dropping
+                return Err(TaurusError::InvalidRequest("invalid protocol".into()));
+            }
+        } else {
+            // If no protocol is found, gemini: is implied
+            s = format!("gemini://{}", s);
+        }
+
         // Extract and parse the url from the request.
         let raw = s
             .trim_end_matches(0x0 as char)
@@ -88,32 +109,35 @@ impl GeminiResponse {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parse_request() {
-        let raw = "gemini://example.space\r\n";
-
+    fn check_request(raw: &str, expected_url: &str) {
         let req = GeminiRequest::parse(raw).unwrap();
+
         assert_eq!(
             req,
             GeminiRequest {
-                url: Url::parse("gemini://example.space").unwrap()
+                url: Url::parse(expected_url).unwrap()
             }
         );
     }
 
     #[test]
-    fn parse_malformed_request() {
-        let raw = "gemini://example.space";
-
-        match GeminiRequest::parse(raw) {
-            Err(TaurusError::InvalidRequest(_)) => {}
-            x => panic!("expected TaurusError::InvalidRequest, got: {:?}", x),
-        }
+    fn parse_request() {
+        check_request("gemini://example.space\r\n", "gemini://example.space");
     }
 
     #[test]
-    fn parse_invalid_request_url() {
-        let raw = "foobar@example.com\r\n";
+    fn parse_without_scheme() {
+        check_request("example.space\r\n", "gemini://example.space");
+    }
+
+    #[test]
+    fn parse_without_scheme_double_slash() {
+        check_request("//example.space\r\n", "gemini://example.space");
+    }
+
+    #[test]
+    fn parse_malformed_request() {
+        let raw = "gemini://example.space";
 
         match GeminiRequest::parse(raw) {
             Err(TaurusError::InvalidRequest(_)) => {}

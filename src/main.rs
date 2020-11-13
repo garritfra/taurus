@@ -134,10 +134,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> TaurusR
         .read(&mut buffer)
         .map_err(TaurusError::StreamReadFailed)?;
 
-    let mut raw_request = String::from_utf8_lossy(&buffer[..]).into_owned();
-    if !raw_request.starts_with("gemini://") {
-        raw_request = format!("gemini://{}", raw_request);
-    }
+    let raw_request = String::from_utf8_lossy(&buffer[..]).into_owned();
 
     let request = GeminiRequest::parse(&raw_request)?;
     let url_path = request.file_path();
