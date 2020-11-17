@@ -19,9 +19,9 @@ An example config might look like this:
 port = 1965
 
 # Your TLS certificate
-certificate_file= "identity.pfx"
+certificate_file = "/etc/taurus/identity.pfx"
 
-# Must match with the password of the generated certificate
+# Must match with the export password of the generated certificate
 certificate_password = "mysecretpassword"
 
 # Your gemini files

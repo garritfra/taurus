@@ -7,3 +7,6 @@ openssl genrsa -des3 -out server.key 4096
 openssl req -new -key server.key -out server.csr
 openssl x509 -req -days 4096 -in server.csr -signkey server.key -out server.crt
 openssl pkcs12 -export -out identity.pfx -inkey server.key -in server.crt
+
+# Clean up
+rm server.key server.csr server.crt
