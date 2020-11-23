@@ -4,14 +4,14 @@ extern crate url;
 mod config;
 mod error;
 mod gemini;
+mod io;
 mod logger;
 
 use error::{TaurusError, TaurusResult};
 use gemini::{GeminiRequest, GeminiResponse};
-use native_tls::{Identity, TlsAcceptor, TlsStream};
+use native_tls::{TlsAcceptor, TlsStream};
 use std::{
-    fs::File,
-    io::{self, Read},
+    io::Read,
     net::{TcpListener, TcpStream},
     path,
     sync::Arc,
@@ -58,9 +58,7 @@ fn run() -> TaurusResult<()> {
         .unwrap_or_else(|| "/var/www/gemini".to_owned());
 
     // Read certificate
-    let identity = read_file(&cert_file).map_err(TaurusError::NoIdentity)?;
-
-    let identity = Identity::from_pkcs12(&identity, &config.certificate_password)?;
+    let identity = crate::io::load_cert(&cert_file, &config.certificate_password)?;
 
     let address = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(address).map_err(TaurusError::BindFailed)?;
@@ -93,40 +91,7 @@ fn run() -> TaurusResult<()> {
     Ok(())
 }
 
-/// Helper function to read a file into Vec
-fn read_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
-    let mut file = File::open(file_path)?;
-    let mut buf = Vec::new();
-
-    file.read_to_end(&mut buf)?;
-
-    Ok(buf)
-}
-
 /// Send file as a response
-fn write_file(path: &str) -> TaurusResult<GeminiResponse> {
-    let extension = path::Path::new(path)
-        .extension()
-        .unwrap_or_else(|| std::ffi::OsStr::new(""));
-
-    let mime_type = match &*extension.to_string_lossy() {
-        "gmi" => "text/gemini; charset=utf-8",
-        ext => mime_guess::from_ext(ext)
-            .first_raw()
-            .unwrap_or("text/plain"),
-    };
-
-    match read_file(path) {
-        Ok(buf) => Ok(GeminiResponse::success(buf, mime_type)),
-        Err(err) => {
-            // Cannot read file or it doesn't exist
-            logger::error(format!("{}: {}", path, err));
-
-            Ok(GeminiResponse::not_found())
-        }
-    }
-}
-
 fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> TaurusResult<usize> {
     let mut buffer = [0; 1024];
 
@@ -151,12 +116,7 @@ fn handle_client(mut stream: TlsStream<TcpStream>, static_root: &str) -> TaurusR
 
         // Check if file/dir exists
         if path.exists() {
-            // If it's a directory, try to find index.gmi
-            if path.is_dir() {
-                write_file(&path.join("index.gmi").to_string_lossy())?.send(stream)
-            } else {
-                write_file(&path.to_string_lossy())?.send(stream)
-            }
+            GeminiResponse::from_file(&crate::io::resolve_path(&path))?.send(stream)
         } else {
             GeminiResponse::not_found().send(stream)
         }

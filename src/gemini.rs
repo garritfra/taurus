@@ -1,5 +1,7 @@
 use crate::error::{TaurusError, TaurusResult};
+use crate::logger;
 use native_tls::TlsStream;
+use std::path;
 use std::{io::Write, net::TcpStream, str::FromStr};
 use url::Url;
 
@@ -80,6 +82,29 @@ impl GeminiResponse {
             status: [b'5', b'1'],
             meta: "Resource not found".into(),
             body: None,
+        }
+    }
+
+    pub fn from_file(path: &str) -> TaurusResult<GeminiResponse> {
+        let extension = path::Path::new(path)
+            .extension()
+            .unwrap_or_else(|| std::ffi::OsStr::new(""));
+
+        let mime_type = match &*extension.to_string_lossy() {
+            "gmi" => "text/gemini; charset=utf-8",
+            ext => mime_guess::from_ext(ext)
+                .first_raw()
+                .unwrap_or("text/plain"),
+        };
+
+        match crate::io::read_file(path) {
+            Ok(buf) => Ok(GeminiResponse::success(buf, mime_type)),
+            Err(err) => {
+                // Cannot read file or it doesn't exist
+                logger::error(format!("{}: {}", path, err));
+
+                Ok(GeminiResponse::not_found())
+            }
         }
     }
 
