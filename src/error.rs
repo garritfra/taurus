@@ -17,6 +17,9 @@ pub enum TaurusError {
     #[error("invalid request: {0}")]
     InvalidRequest(String),
 
+    #[error("invalid Unicode character in the input")]
+    InvalidUnicode(#[from] std::string::FromUtf8Error),
+
     #[error("failed to bind: {0}")]
     BindFailed(io::Error),
 
