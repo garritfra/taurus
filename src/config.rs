@@ -1,6 +1,5 @@
 use serde::Deserialize;
-use std::fs;
-use std::io::prelude::*;
+use std::{fs, path::Path};
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -13,12 +12,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(config_path: &str) -> anyhow::Result<Self> {
-        let mut file = fs::File::open(config_path)?;
-        let mut contents = String::new();
-
-        file.read_to_string(&mut contents)?;
-
-        Ok(toml::from_str(&contents)?)
+    pub fn load<P: AsRef<Path>>(config_path: P) -> anyhow::Result<Self> {
+        let buf = fs::read_to_string(config_path)?;
+        toml::from_str(&buf).map_err(|e| e.into())
     }
 }
